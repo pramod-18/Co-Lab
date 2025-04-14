@@ -15,6 +15,20 @@ import { io } from "socket.io-client";
 import socket from "./socket";
 import axios from "axios"
 
+// src/api.js or src/services/api.js
+const API_URL = import.meta.env.VITE_API_URL;
+
+export const fetchRooms = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/rooms`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching rooms:", error);
+    throw error;
+  }
+};
+
+
 socket.connect();
 
 const getJudge0LangId = (lang: string): number => {

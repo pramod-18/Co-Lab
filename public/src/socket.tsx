@@ -1,7 +1,7 @@
 // socket.js or socket.ts if using TypeScript
 import { io } from "socket.io-client";
 
-const socket = io("http://10.81.35.101:3000", {
+const socket = io("https://co-lab-irhl.onrender.com", {
   autoConnect: false, // Optional: control connection manually
 });
 
