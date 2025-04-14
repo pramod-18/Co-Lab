@@ -14,7 +14,7 @@ let messages = {};
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: ['https://10.81.35.101:5173', 'https://co-lab-beta.vercel.app'],
     methods: ["GET", "POST"],
     credentials: true
   }
