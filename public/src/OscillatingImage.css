@@ -1,0 +1,9 @@
+@keyframes oscillate {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(10px); -webkit-transform: translateY(10px); -moz-transform: translateY(10px); -ms-transform: translateY(10px); -o-transform: translateY(10px); } /* Adjust oscillation height */
+  }
+  
+  .oscillate {
+    animation: oscillate 1s infinite ease-in-out;
+  }
+  
