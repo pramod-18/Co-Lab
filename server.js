@@ -1,7 +1,22 @@
 const express = require("express");
-const { createServer } = require("http");
-const { Server } = require("socket.io");
+const {
+  createServer
+} = require("http");
+const {
+  Server
+} = require("socket.io");
+const mongoose = require('mongoose');
+const Document = require('./Document');
 const path = require("path");
+
+mongoose.connect("mongodb://localhost/Co-lab")
+  .then(() => {
+    console.log("MongoDB connected");
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+  });
+
 
 const app = express();
 const server = createServer(app);
@@ -14,7 +29,7 @@ let messages = {};
 
 const io = new Server(server, {
   cors: {
-    origin: ['https://10.81.35.101:5173', 'https://co-lab-beta.vercel.app'],
+    origin: "*",
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -22,40 +37,184 @@ const io = new Server(server, {
 
 io.on("connection", (socket) => {
   console.log("A user connected");
-  socket.on("joinRoom", ({UserName, RoomId}) => {
+
+
+  socket.on("joinRoom", async ({
+    UserName,
+    RoomId,
+    flag
+  }) => {
     count = count + 1;
     console.log(`${UserName} joined room: ${RoomId}`);
-    socket.join(RoomId);
-    io.to(RoomId).emit("newJoin", UserName);
-    if (1) {
-      if(rooms[RoomId] === undefined) rooms[RoomId] = "// Write Your Code Here.";
-      socket.emit("loadContent", rooms[RoomId]);
-      socket.emit("loadMessages", messages[RoomId] || []);
+    if (flag === 0) {
+      const doc = await Document.findById(RoomId);
+
+      if (!doc) {
+        const newDoc = new Document({
+          _id: RoomId,
+          users: [UserName] 
+        });
+        await newDoc.save();
+      } else {
+        if (!doc.users.includes(UserName)) {
+          doc.users.push(UserName);
+          await doc.save();
+        }
+        socket.join(RoomId);
+        socket.username = UserName;
+        socket.roomId = RoomId;
+        io.to(RoomId).emit("newJoin", UserName);
+        if (1) {
+          if (rooms[RoomId] === undefined) rooms[RoomId] = "// Write Your Code Here.";
+          socket.emit("loadContent", rooms[RoomId]);
+          socket.emit("loadMessages", messages[RoomId] || []);
+        } else {
+          rooms[RoomId] = "";
+        }
+      }
+      socket.join(RoomId);
+      socket.username = UserName;
+      socket.roomId = RoomId;
+      io.to(RoomId).emit("newJoin", UserName);
+      if (1) {
+        if (rooms[RoomId] === undefined) rooms[RoomId] = "// Write Your Code Here.";
+        socket.emit("loadContent", rooms[RoomId]);
+        socket.emit("loadMessages", messages[RoomId] || []);
+      } else {
+        rooms[RoomId] = "";
+      }
     } else {
-      rooms[RoomId] = "";
+      try {
+        const doc = await Document.findById(RoomId);
+        if (!doc) {
+          console.log('No Valid Room');
+          socket.emit("Invalid id");
+        } else {
+          socket.emit("joined-room");
+          if (!doc.users.includes(UserName)) {
+            doc.users.push(UserName);
+            await doc.save();
+          }
+          socket.join(RoomId);
+          socket.username = UserName;
+          socket.roomId = RoomId;
+          io.to(RoomId).emit("newJoin", UserName);
+          if (1) {
+            if (rooms[RoomId] === undefined) rooms[RoomId] = "// Write Your Code Here.";
+            socket.emit("loadContent", rooms[RoomId]);
+            socket.emit("loadMessages", messages[RoomId] || []);
+          } else {
+            rooms[RoomId] = "";
+          }
+        }
+
+      } catch (err) {
+        console.error("Error adding user to the database:", err);
+        socket.emit("error", "Error adding user to the database");
+      }
     }
+
   });
 
-  socket.on("textChange", ({ RoomId, content }) => {
+  socket.on("textChange", ({
+    RoomId,
+    content
+  }) => {
     rooms[RoomId] = content;
     io.to(RoomId).emit("updateText", content);
   });
 
-  socket.on("newMsg", ({RoomId, newmsg}) => {
+  socket.on("newMsg", ({
+    RoomId,
+    newmsg
+  }) => {
     if (!messages[RoomId]) {
       messages[RoomId] = [];
     }
     messages[RoomId].push(newmsg);
     io.to(RoomId).emit("updateMsgs", messages[RoomId]);
   })
+  socket.on("showusers", async (roomId) => {
+    console.log('u');
+    try {
+      const doc = await Document.findById(roomId);
 
-  socket.on("leave", ({ UserName, RoomId }) => {
-    io.to(RoomId).emit("userExit", UserName);
-  })
+      if (!doc) {
+        socket.emit("showusers-response", {
+          success: false,
+          message: "Room not found",
+        });
+        return;
+      }
 
-  socket.on("disconnect", () => {
+      socket.emit("showusers-response", {
+        success: true,
+        users: doc.users,
+      });
+
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      socket.emit("showusers-response", {
+        success: false,
+        message: "Error retrieving users",
+      });
+    }
+  });
+
+  socket.on("leave", async ({
+    UserName,
+    RoomId
+  }) => {
+    try {
+      const doc = await Document.findById(RoomId);
+      if (doc && doc.users.includes(UserName)) {
+        doc.users = doc.users.filter(user => user !== UserName);
+        await doc.save();
+
+        io.to(RoomId).emit("userExit", UserName);
+
+        io.to(RoomId).emit("showusers-response", {
+          success: true,
+          users: doc.users
+        });
+      }
+      delete socketUserMap[socket.id];
+      socket.leave(RoomId);
+    } catch (err) {
+      console.error("Error handling leave:", err);
+      socket.emit("error", "Error processing leave request");
+    }
+  });
+
+
+  socket.on("disconnect", async () => {
+    const {
+      username,
+      roomId
+    } = socket;
+
+    if (username && roomId) {
+      try {
+        const doc = await Document.findById(roomId);
+        if (doc && doc.users.includes(username)) {
+          doc.users = doc.users.filter(user => user !== username);
+          await doc.save();
+
+          io.to(roomId).emit("userExit", username);
+          io.to(roomId).emit("showusers-response", {
+            success: true,
+            users: doc.users
+          });
+        }
+
+      } catch (err) {
+        console.error("Error handling disconnect cleanup:", err);
+      }
+    }
+
     console.log("User disconnected");
   });
+
 });
 
 app.get("/room/:id", (req, res) => {

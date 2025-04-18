@@ -1,33 +1,21 @@
 import { Editor } from "@monaco-editor/react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import Avatar from "react-avatar";
 import {
   faCopy,
   faDownload,
   faTimes,
   faPlay,
   faComments,
+  faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import showPopup from "./PopUp";
 import React, { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 // const socket = io("http://localhost:3000");
 import socket from "./socket";
-import axios from "axios"
-
-// src/api.js or src/services/api.js
-const API_URL = import.meta.env.VITE_API_URL;
-
-export const fetchRooms = async () => {
-  try {
-    const response = await axios.get(`${API_URL}/api/rooms`);
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching rooms:", error);
-    throw error;
-  }
-};
-
+import axios from "axios";
 
 socket.connect();
 
@@ -57,11 +45,11 @@ function Page2() {
   const [showChat, setShowChat] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<string[]>([]);
   const [message, setMessage] = useState<string>("");
-  const { UserName, RoomId } = location.state ?? {};
+  const { UserName, RoomId, flag } = location.state ?? {};
   const [output, setOutput] = useState<string>("No output");
   const [input, setInput] = useState<string>("");
-  // const [users, setUsers] = useState<{ UserName: string }[]>([]);
-  // const [defval, setDefVal] = useState<string>("// Write Your Code Here.");
+  const [users, setUsers] = useState<string[]>([]);
+  const [showUsers, setShowUsers] = useState(false);
 
   useEffect(() => {
     if (!UserName || !RoomId) {
@@ -72,9 +60,8 @@ function Page2() {
   }, [UserName, RoomId, navigate]);
 
   useEffect(() => {
-    if (UserName && RoomId) socket.emit("joinRoom", { UserName, RoomId });
+    if (UserName && RoomId) socket.emit("joinRoom", { UserName, RoomId, flag });
   }, []);
-
 
   const handleCopy = () => {
     navigator.clipboard
@@ -126,7 +113,7 @@ function Page2() {
       console.log(result);
       if (result.stdout === null && result.stderr === null)
         setOutput("No Output");
-      else setOutput(atob(result.stdout || result.stderr));
+      else setOutput(atob(result.stdout ?? result.stderr));
     } catch (err) {
       console.error(err);
       setOutput("Execution error");
@@ -135,6 +122,7 @@ function Page2() {
 
   const toggleChat = () => {
     setShowChat((prev) => !prev);
+    setShowUsers(false);
   };
 
   const sendMessage = () => {
@@ -174,7 +162,8 @@ function Page2() {
 
   socket.on("userExit", (userName) => {
     showPopup(`${userName} left`, "#ff4d4d", false);
-  })
+    setUsers((prevUsers) => prevUsers.filter((user) => user !== userName));
+  });
 
   socket.on("loadMessages", (messages: string[] = []) => {
     setChatMessages(messages || []);
@@ -182,6 +171,15 @@ function Page2() {
 
   socket.on("updateMsgs", (msgs: string[] = []) => {
     setChatMessages(msgs || []);
+  });
+
+  socket.on("showusers-response", (data) => {
+    if (data.success) {
+      // alert("Users in room:\n" + data.users.join("\n"));
+      setUsers(data.users);
+    } else {
+      alert(data.message);
+    }
   });
 
   return (
@@ -218,6 +216,17 @@ function Page2() {
         <div style={{ display: "flex", gap: "10px" }}>
           {[
             {
+              title: "Users",
+              icon: faUserGroup,
+              action: () => {
+                setShowUsers((prev) => !prev);
+                setShowChat(false);
+                console.log("Fetching users...");
+                socket.emit("showusers", RoomId);
+              },
+              hoverColor: "#ffa500",
+            },
+            {
               title: "Run Code",
               icon: faPlay,
               action: handleRun,
@@ -240,7 +249,7 @@ function Page2() {
               icon: faTimes,
               action: () => {
                 // showPopup(`You left the room`, "#ff4d4d");
-                socket.emit("leave", {UserName, RoomId});
+                socket.emit("leave", { UserName, RoomId });
                 setTimeout(() => {
                   socket.disconnect();
                   navigate("/", { replace: true });
@@ -366,7 +375,6 @@ function Page2() {
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Type a message..."
                   style={{
-                    // flex: 1,
                     padding: "8px",
                     borderRadius: "8px",
                     border: "1px solid #ccc",
@@ -377,7 +385,6 @@ function Page2() {
                 <button
                   onClick={sendMessage}
                   style={{
-                    // flex: 1,
                     marginLeft: "5px",
                     padding: "8px",
                     borderRadius: "8px",
@@ -391,6 +398,53 @@ function Page2() {
                   Send
                 </button>
               </div>
+            </div>
+          ) : showUsers ? (
+            <div
+              style={{
+                padding: "10px",
+                backgroundColor: "#ffffff",
+                borderRadius: "12px",
+                border: "1px solid #ccc",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+                maxHeight: "100%",
+                overflowY: "auto",
+              }}
+            >
+              <h4 style={{ marginBottom: "10px", textAlign: "center" }}>
+                Active Users
+              </h4>
+
+              {users.length === 0 ? (
+                <p style={{ textAlign: "center", color: "#777" }}>No users</p>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  {users.map((user, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        backgroundColor: "#f5f5f5",
+                      }}
+                    >
+                      <Avatar name={user} size="40" round={true} />
+                      <span style={{ fontWeight: "500", fontSize: "16px" }}>
+                        {user}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div

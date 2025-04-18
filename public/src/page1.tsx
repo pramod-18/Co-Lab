@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import GenerateId from "./GenerateId";
 import showPopup from "./PopUp";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,23 @@ function Page1() {
   const [UserName, setUserName] = useState("");
   const [RoomId, setRoomId] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    socket.on("Invalid id", () => {
+      showPopup("Invalid Room Id", "#ff4d4d", false);
+    });
+
+    socket.on("joined-room", () => {
+      navigate(`/room/${RoomId}`, {
+        state: { UserName, RoomId, flag: 1 },
+      });
+    });
+
+    return () => {
+      socket.off("Invalid id");
+      socket.off("joined-room");
+    };
+  });
 
   return (
     <div
@@ -34,7 +51,6 @@ function Page1() {
         />
       </div>
 
-      {/* Form Section */}
       <div
         style={{
           flex: "1",
@@ -47,7 +63,6 @@ function Page1() {
           width: "100%",
         }}
       >
-        {/* Username Input */}
         <input
           style={{
             width: "70%",
@@ -64,7 +79,6 @@ function Page1() {
           onChange={(e) => setUserName(e.target.value)}
         />
 
-        {/* Room ID Input */}
         <input
           style={{
             width: "70%",
@@ -81,7 +95,6 @@ function Page1() {
           onChange={(e) => setRoomId(e.target.value)}
         />
 
-        {/* Join Room Button */}
         <button
           style={{
             width: "70%",
@@ -110,15 +123,13 @@ function Page1() {
               showPopup("Enter Room-ID");
             } else {
               socket.connect();
-              // socket.emit("joinRoom", ({UserName, RoomId}));
-              navigate(`/room/${RoomId}`, { state: { UserName, RoomId: RoomId } });
+              socket.emit("joinRoom", { UserName, RoomId, flag: 1 });
             }
           }}
         >
           JOIN ROOM
         </button>
 
-        {/* Create Room Button */}
         <button
           style={{
             width: "70%",
@@ -147,7 +158,9 @@ function Page1() {
               let id = GenerateId();
               socket.connect();
               // socket.emit("joinRoom", ({UserName, id}));
-              navigate(`/room/${id}`, { state: { UserName, RoomId: id } });
+              navigate(`/room/${id}`, {
+                state: { UserName, RoomId: id, flag: 0 },
+              });
             }
           }}
         >
