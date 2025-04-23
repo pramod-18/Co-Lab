@@ -15,6 +15,10 @@ function Page1() {
       showPopup("Invalid Room Id", "#ff4d4d", false);
     });
 
+    socket.on("Username exists", () => {
+      showPopup(`Username ${UserName} already exists`, "#ff4d4d", false);
+    });
+
     socket.on("joined-room", () => {
       navigate(`/room/${RoomId}`, {
         state: { UserName, RoomId, flag: 1 },
@@ -154,6 +158,8 @@ function Page1() {
           onClick={() => {
             if (!UserName) {
               showPopup("Enter Username");
+            } else if (RoomId) {
+              showPopup("Remove ID to proceed");
             } else {
               let id = GenerateId();
               socket.connect();

@@ -15,7 +15,7 @@ import React, { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 // const socket = io("http://localhost:3000");
 import socket from "./socket";
-import axios from "axios";
+import { CopyToClipboard } from "react-copy-to-clipboard";
 
 socket.connect();
 
@@ -60,18 +60,12 @@ function Page2() {
   }, [UserName, RoomId, navigate]);
 
   useEffect(() => {
-    if (UserName && RoomId) socket.emit("joinRoom", { UserName, RoomId, flag });
+    if (UserName && RoomId && flag === 0)
+      socket.emit("joinRoom", { UserName, RoomId, flag });
   }, []);
 
   const handleCopy = () => {
-    navigator.clipboard
-      .writeText(RoomId)
-      .then(() => {
-        showPopup("Room ID copied", "white");
-      })
-      .catch((err) => {
-        console.error("Failed to copy: ", err);
-      });
+    showPopup("Room ID copied", "white");
   };
 
   const handleDownload = () => {
@@ -111,7 +105,9 @@ function Page2() {
 
       const result = await response.json();
       console.log(result);
-      if (result.stdout === null && result.stderr === null)
+      if (result.status.description !== "Accepted")
+        setOutput((result.status.description));
+      else if (result.stdout === null && result.stderr === null)
         setOutput("No Output");
       else setOutput(atob(result.stdout ?? result.stderr));
     } catch (err) {
@@ -214,6 +210,35 @@ function Page2() {
         </select>
 
         <div style={{ display: "flex", gap: "10px" }}>
+          <CopyToClipboard text={RoomId} onCopy={handleCopy}>
+            <button
+              title="Copy ID"
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "50%",
+                border: "1px solid white",
+                backgroundColor: "white",
+                color: "black",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background-color 0.3s ease",
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = "black";
+                e.currentTarget.style.color = "white";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = "white";
+                e.currentTarget.style.color = "black";
+              }}
+            >
+              <FontAwesomeIcon icon={faCopy} size="lg" />
+            </button>
+          </CopyToClipboard>
+
           {[
             {
               title: "Users",
@@ -236,12 +261,6 @@ function Page2() {
               title: "Download Code",
               icon: faDownload,
               action: handleDownload,
-              hoverColor: "black",
-            },
-            {
-              title: "Copy ID",
-              icon: faCopy,
-              action: handleCopy,
               hoverColor: "black",
             },
             {
@@ -373,6 +392,11 @@ function Page2() {
                   type="text"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      sendMessage();
+                    }
+                  }}
                   placeholder="Type a message..."
                   style={{
                     padding: "8px",

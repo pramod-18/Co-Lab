@@ -90,22 +90,27 @@ io.on("connection", (socket) => {
           console.log('No Valid Room');
           socket.emit("Invalid id");
         } else {
-          socket.emit("joined-room");
-          if (!doc.users.includes(UserName)) {
+          if (doc.users.includes(UserName)) {
+            console.log("Username exists");
+            socket.emit("Username exists");
+          }
+          else{
+            socket.emit("joined-room");
             doc.users.push(UserName);
             await doc.save();
+            socket.join(RoomId);
+            socket.username = UserName;
+            socket.roomId = RoomId;
+            io.to(RoomId).emit("newJoin", UserName);
+            if (1) {
+              if (rooms[RoomId] === undefined) rooms[RoomId] = "// Write Your Code Here.";
+              socket.emit("loadContent", rooms[RoomId]);
+              socket.emit("loadMessages", messages[RoomId] || []);
+            } else {
+              rooms[RoomId] = "";
+            }
           }
-          socket.join(RoomId);
-          socket.username = UserName;
-          socket.roomId = RoomId;
-          io.to(RoomId).emit("newJoin", UserName);
-          if (1) {
-            if (rooms[RoomId] === undefined) rooms[RoomId] = "// Write Your Code Here.";
-            socket.emit("loadContent", rooms[RoomId]);
-            socket.emit("loadMessages", messages[RoomId] || []);
-          } else {
-            rooms[RoomId] = "";
-          }
+          
         }
 
       } catch (err) {
@@ -178,7 +183,6 @@ io.on("connection", (socket) => {
           users: doc.users
         });
       }
-      delete socketUserMap[socket.id];
       socket.leave(RoomId);
     } catch (err) {
       console.error("Error handling leave:", err);
@@ -206,6 +210,7 @@ io.on("connection", (socket) => {
             users: doc.users
           });
         }
+        socket.leave(roomId);
 
       } catch (err) {
         console.error("Error handling disconnect cleanup:", err);

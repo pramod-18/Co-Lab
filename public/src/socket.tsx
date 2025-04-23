@@ -1,8 +1,7 @@
-// socket.js or socket.ts if using TypeScript
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:3000", {
-  autoConnect: false, // Optional: control connection manually
+const socket = io("10.81.38.174:3000", {
+  autoConnect: false, 
 });
 
-export default socket;
+export default socket; 
