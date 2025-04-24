@@ -4,6 +4,7 @@ import showPopup from "./PopUp";
 import { useNavigate } from "react-router-dom";
 import "./OscillatingImage.css";
 import socket from "./socket";
+import { encryptRoomId } from "./encrypt";
 
 function Page1() {
   const [UserName, setUserName] = useState("");
@@ -20,7 +21,8 @@ function Page1() {
     });
 
     socket.on("joined-room", () => {
-      navigate(`/room/${RoomId}`, {
+      let erid = encryptRoomId(RoomId);
+      navigate(`/room/${erid}`, {
         state: { UserName, RoomId, flag: 1 },
       });
     });
@@ -164,7 +166,8 @@ function Page1() {
               let id = GenerateId();
               socket.connect();
               // socket.emit("joinRoom", ({UserName, id}));
-              navigate(`/room/${id}`, {
+              let erid = encryptRoomId(id);
+              navigate(`/room/${erid}`, {
                 state: { UserName, RoomId: id, flag: 0 },
               });
             }
