@@ -47,7 +47,6 @@ function stringToColor(str: string): string {
   return color;
 }
 
-
 function Page2() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,11 +119,21 @@ function Page2() {
 
       const result = await response.json();
       console.log(result);
-      if (result.status.description !== "Accepted")
+
+      if (result.status.description !== "Accepted") {
         setOutput(result.status.description);
-      else if (result.stdout === null && result.stderr === null)
-        setOutput("No Output");
-      else setOutput(atob(result.stdout ?? result.stderr));
+      } else {
+        const stdout = result.stdout ? atob(result.stdout) : "";
+        const stderr = result.stderr ? atob(result.stderr) : "";
+        const time = result.time ?? "N/A";
+        const memory = result.memory ? `${result.memory} KB` : "N/A";
+
+        const finalOutput =
+          (stdout || stderr || "No Output") +
+          `\n\n\n---------------------------\n---------------------------\nTime: ${time} sec\nMemory: ${memory}`;
+
+        setOutput(finalOutput);
+      }
     } catch (err) {
       console.error(err);
       setOutput("Execution error");
