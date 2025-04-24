@@ -12,7 +12,7 @@ function Page1() {
 
   useEffect(() => {
     socket.on("Invalid id", () => {
-      showPopup("Invalid Room Id", "#ff4d4d", false);
+      showPopup("Invalid CoLab Id", "#ff4d4d", false);
     });
 
     socket.on("Username exists", () => {
@@ -94,7 +94,7 @@ function Page1() {
             outline: "none",
           }}
           type="text"
-          placeholder="Room-ID"
+          placeholder="CoLab-ID"
           value={RoomId}
           onChange={(e) => setRoomId(e.target.value)}
         />
@@ -124,7 +124,7 @@ function Page1() {
             if (!UserName) {
               showPopup("Enter Username");
             } else if (!RoomId) {
-              showPopup("Enter Room-ID");
+              showPopup("Enter CoLab-ID");
             } else {
               socket.connect();
               socket.emit("joinRoom", { UserName, RoomId, flag: 1 });

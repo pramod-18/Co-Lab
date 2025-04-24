@@ -129,16 +129,20 @@ io.on("connection", (socket) => {
     io.to(RoomId).emit("updateText", content);
   });
 
-  socket.on("newMsg", ({
-    RoomId,
-    newmsg
-  }) => {
+  socket.on("newMsg", ({ RoomId, message }) => {
     if (!messages[RoomId]) {
       messages[RoomId] = [];
     }
-    messages[RoomId].push(newmsg);
+  
+    const formattedMessage = {
+      sender: socket.username || "Unknown",
+      text: message
+    };
+  
+    messages[RoomId].push(formattedMessage);
     io.to(RoomId).emit("updateMsgs", messages[RoomId]);
-  })
+  });
+  
   socket.on("showusers", async (roomId) => {
     console.log('u');
     try {

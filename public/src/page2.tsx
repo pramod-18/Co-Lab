@@ -2,6 +2,7 @@ import { Editor } from "@monaco-editor/react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Avatar from "react-avatar";
+import { useRef } from "react";
 import {
   faCopy,
   faDownload,
@@ -9,6 +10,7 @@ import {
   faPlay,
   faComments,
   faUserGroup,
+  faFolderOpen,
 } from "@fortawesome/free-solid-svg-icons";
 import showPopup from "./PopUp";
 import React, { useState, useEffect } from "react";
@@ -36,6 +38,16 @@ const getJudge0LangId = (lang: string): number => {
   }
 };
 
+function stringToColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const color = `hsl(${hash % 360}, 70%, 50%)`;
+  return color;
+}
+
+
 function Page2() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,13 +55,16 @@ function Page2() {
   const [lang, setLang] = useState<string>("cpp");
   const [selectedValue, setSelectedValue] = useState<string>("cpp");
   const [showChat, setShowChat] = useState<boolean>(false);
-  const [chatMessages, setChatMessages] = useState<string[]>([]);
+  const [chatMessages, setChatMessages] = useState<
+    (string | { sender: string; text: string })[]
+  >([]);
   const [message, setMessage] = useState<string>("");
   const { UserName, RoomId, flag } = location.state ?? {};
   const [output, setOutput] = useState<string>("No output");
   const [input, setInput] = useState<string>("");
   const [users, setUsers] = useState<string[]>([]);
   const [showUsers, setShowUsers] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!UserName || !RoomId) {
@@ -65,7 +80,7 @@ function Page2() {
   }, []);
 
   const handleCopy = () => {
-    showPopup("Room ID copied", "white");
+    showPopup("CoLab ID copied", "white");
   };
 
   const handleDownload = () => {
@@ -106,7 +121,7 @@ function Page2() {
       const result = await response.json();
       console.log(result);
       if (result.status.description !== "Accepted")
-        setOutput((result.status.description));
+        setOutput(result.status.description);
       else if (result.stdout === null && result.stderr === null)
         setOutput("No Output");
       else setOutput(atob(result.stdout ?? result.stderr));
@@ -123,10 +138,10 @@ function Page2() {
 
   const sendMessage = () => {
     if (message.trim() !== "") {
-      const newmsg = `${UserName}: ${message}`;
-      setChatMessages([...chatMessages, `${UserName}: ${message}`]);
+      const newMsg = { sender: UserName, text: message };
+      setChatMessages([...chatMessages, newMsg]);
       setMessage("");
-      socket.emit("newMsg", { RoomId, newmsg });
+      socket.emit("newMsg", { RoomId, message });
     }
   };
 
@@ -140,6 +155,25 @@ function Page2() {
     const newContent = value ?? "hi";
     setCode(newContent);
     socket.emit("textChange", { RoomId, content: newContent });
+  };
+
+  const handleFileSelect = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const fileContent = event.target?.result as string;
+        setCode(fileContent);
+        socket.emit("textChange", { RoomId, content: fileContent });
+      };
+      reader.readAsText(file);
+    }
   };
 
   socket.on("updateText", (content: string) => {
@@ -161,13 +195,19 @@ function Page2() {
     setUsers((prevUsers) => prevUsers.filter((user) => user !== userName));
   });
 
-  socket.on("loadMessages", (messages: string[] = []) => {
-    setChatMessages(messages || []);
-  });
+  socket.on(
+    "loadMessages",
+    (messages: (string | { sender: string; text: string })[] = []) => {
+      setChatMessages(messages);
+    }
+  );
 
-  socket.on("updateMsgs", (msgs: string[] = []) => {
-    setChatMessages(msgs || []);
-  });
+  socket.on(
+    "updateMsgs",
+    (msgs: (string | { sender: string; text: string })[] = []) => {
+      setChatMessages(msgs);
+    }
+  );
 
   socket.on("showusers-response", (data) => {
     if (data.success) {
@@ -177,6 +217,33 @@ function Page2() {
       alert(data.message);
     }
   });
+
+  const buttonStyle = {
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    border: "1px solid white",
+    backgroundColor: "white",
+    color: "black",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "background-color 0.3s ease",
+  };
+
+  const hoverStyle = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    color: string
+  ) => {
+    e.currentTarget.style.backgroundColor = color;
+    e.currentTarget.style.color = "white";
+  };
+
+  const resetStyle = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.backgroundColor = "white";
+    e.currentTarget.style.color = "black";
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -210,108 +277,99 @@ function Page2() {
         </select>
 
         <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            title="Users"
+            style={buttonStyle}
+            onMouseOver={(e) => hoverStyle(e, "#ffa500")}
+            onMouseOut={resetStyle}
+            onClick={() => {
+              setShowUsers((prev) => !prev);
+              setShowChat(false);
+              socket.emit("showusers", RoomId);
+            }}
+          >
+            <FontAwesomeIcon icon={faUserGroup} size="lg" />
+          </button>
+
+          <button
+            title="Toggle Chat"
+            style={buttonStyle}
+            onMouseOver={(e) => hoverStyle(e, "#66ff33")}
+            onMouseOut={resetStyle}
+            onClick={toggleChat}
+          >
+            <FontAwesomeIcon icon={faComments} size="lg" />
+          </button>
+
+          <button
+            title="Run Code"
+            style={buttonStyle}
+            onMouseOver={(e) => hoverStyle(e, "#3399ff")}
+            onMouseOut={resetStyle}
+            onClick={handleRun}
+          >
+            <FontAwesomeIcon icon={faPlay} size="lg" />
+          </button>
+
+          <button
+            title="Import Code"
+            style={buttonStyle}
+            onMouseOver={(e) => hoverStyle(e, "black")}
+            onMouseOut={resetStyle}
+            onClick={handleFileSelect}
+          >
+            <FontAwesomeIcon icon={faFolderOpen} size="lg" />
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+            accept=".cpp,.c,.java,.py,.js,.txt"
+          />
+
+          <button
+            title="Download Code"
+            style={buttonStyle}
+            onMouseOver={(e) => hoverStyle(e, "black")}
+            onMouseOut={resetStyle}
+            onClick={handleDownload}
+          >
+            <FontAwesomeIcon icon={faDownload} size="lg" />
+          </button>
+
           <CopyToClipboard text={RoomId} onCopy={handleCopy}>
             <button
               title="Copy ID"
-              style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "50%",
-                border: "1px solid white",
-                backgroundColor: "white",
-                color: "black",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "background-color 0.3s ease",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = "black";
-                e.currentTarget.style.color = "white";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = "white";
-                e.currentTarget.style.color = "black";
-              }}
+              style={buttonStyle}
+              onMouseOver={(e) => hoverStyle(e, "black")}
+              onMouseOut={resetStyle}
             >
               <FontAwesomeIcon icon={faCopy} size="lg" />
             </button>
           </CopyToClipboard>
 
-          {[
-            {
-              title: "Users",
-              icon: faUserGroup,
-              action: () => {
-                setShowUsers((prev) => !prev);
-                setShowChat(false);
-                console.log("Fetching users...");
-                socket.emit("showusers", RoomId);
-              },
-              hoverColor: "#ffa500",
-            },
-            {
-              title: "Run Code",
-              icon: faPlay,
-              action: handleRun,
-              hoverColor: "#3399ff",
-            },
-            {
-              title: "Download Code",
-              icon: faDownload,
-              action: handleDownload,
-              hoverColor: "black",
-            },
-            {
-              title: "Exit Room",
-              icon: faTimes,
-              action: () => {
-                // showPopup(`You left the room`, "#ff4d4d");
+          <button
+            title="Exit Room"
+            style={buttonStyle}
+            onMouseOver={(e) => hoverStyle(e, "#ff3300")}
+            onMouseOut={resetStyle}
+            onClick={() => {
+              const confirmed = window.confirm(
+                "Are you sure you want to leave the room?"
+              );
+              if (confirmed) {
                 socket.emit("leave", { UserName, RoomId });
                 setTimeout(() => {
                   socket.disconnect();
                   navigate("/", { replace: true });
                 }, 100);
-              },
-              hoverColor: "#ff3300",
-            },
-            {
-              title: "Toggle Chat",
-              icon: faComments,
-              action: toggleChat,
-              hoverColor: "#66ff33",
-            },
-          ].map(({ title, icon, action, hoverColor }, index) => (
-            <button
-              key={index}
-              title={title}
-              style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "50%",
-                border: "1px solid white",
-                backgroundColor: "white",
-                color: "black",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "background-color 0.3s ease",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = hoverColor;
-                e.currentTarget.style.color = "white";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = "white";
-                e.currentTarget.style.color = "black";
-              }}
-              onClick={action}
-            >
-              <FontAwesomeIcon icon={icon} size="lg" />
-            </button>
-          ))}
+              }
+            }}
+          >
+            <FontAwesomeIcon icon={faTimes} size="lg" />
+          </button>
         </div>
       </div>
 
@@ -341,7 +399,7 @@ function Page2() {
 
         <div
           style={{
-            width: "25%",
+            width: "29%",
             padding: "10px",
             borderLeft: "2px solid gray",
             backgroundColor: "#f8f9fa",
@@ -380,11 +438,24 @@ function Page2() {
                 {chatMessages.length === 0 ? (
                   <p>No messages yet</p>
                 ) : (
-                  chatMessages.map((msg, index) => (
-                    <p key={index} style={{ marginBottom: "5px" }}>
-                      {msg}
-                    </p>
-                  ))
+                  chatMessages.map((msg, index) => {
+                    if (typeof msg === "string") {
+                      return (
+                        <p key={index} style={{ marginBottom: "5px" }}>
+                          {msg}
+                        </p>
+                      );
+                    }
+                    const color = stringToColor(msg.sender);
+                    return (
+                      <div key={index} style={{ marginBottom: "5px" }}>
+                        <span style={{ color, fontWeight: "bold" }}>
+                          {msg.sender}
+                        </span>{" "}
+                        <span>: {msg.text}</span>
+                      </div>
+                    );
+                  })
                 )}
               </div>
               <div style={{ display: "flex", marginTop: "10px" }}>
