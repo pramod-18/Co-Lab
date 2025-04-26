@@ -45,13 +45,21 @@
    git clone https://github.com/<your-username>/Co-Lab.git
    ```
 3. **Install dependencies:**
+
    ```bash
    npm install
    cd public
    npm install
    cd ..
    ```
-4. **Start the servers:**
+   Make sure you install the MongoDB service and the service is running.
+
+   To check if MongoDB service is running, go to services(system) and check for MongoDB service.
+
+   If you cannot find MongoDB service, you can install MongoDB from [https://www.mongodb.com/try/download/community](https://www.mongodb.com/try/download/community).
+   
+5. **Start the servers:**
+   
    Backend:
    ```bash
    node server.js
@@ -61,12 +69,13 @@
    cd public
    npm run dev
    ```
-5. **Access the application:**
+6. **Access the application:**
+   
    ```bash
    http://localhost:5173/
    ```
 
-6. **Access from a different PC:**
+7. **Access from a different PC:**
    
    To access this from a different PC, get the IPv4 address of the system in which installation is done by using the following command
     ```bash
@@ -75,4 +84,7 @@
    Go to ``` public/src/socket.tsx ``` and change ``` localhost:3000 ``` to ``` <IPv4 address>:3000 ```
    
    Now you can visit ```http://<IPv4 address>:5173/```
+
+
+
 
